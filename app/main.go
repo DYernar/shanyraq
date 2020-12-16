@@ -19,7 +19,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", controllers.MainPage)
-	mux.HandleFunc("/auth", controllers.Auth)
+	mux.HandleFunc("/auth", controllers.Register)
 	mux.HandleFunc("/login", controllers.Login)
 
 	handler := cors.Default().Handler(mux)
