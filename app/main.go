@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	mainControllers "shanyraq/controllers/main"
+	"shanyraq/controllers"
 
 	"github.com/rs/cors"
 )
@@ -18,7 +18,9 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", mainControllers.MainPage)
+	mux.HandleFunc("/", controllers.MainPage)
+	mux.HandleFunc("/auth", controllers.Auth)
+	mux.HandleFunc("/login", controllers.Login)
 
 	handler := cors.Default().Handler(mux)
 
