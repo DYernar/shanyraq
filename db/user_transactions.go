@@ -1,209 +1,199 @@
 package db
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
+	"math/rand"
 	model "shanyraq/models"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 //Save user to db
-func SaveUser(user model.User) error {
-	db, err := DbConnect()
-	if err != nil {
-		return err
+func SaveUser(user model.User) (interface{}, error) {
+	isUnique, err := IsUniqueUser(user)
+	if !isUnique {
+		return nil, err
 	}
+	db, ctx := MongoDbConnect()
 
-	is_unique, err := IsUniqueUser(user)
-	if !is_unique {
-		return err
-	}
+	users := db.Collection("users")
 
 	hashedPassword, err := EncryptPassword([]byte(user.Password))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = db.Query("insert into users(username, name, surname, email, telephone, password, isValidated) values($1, $2, $3, $4, $5, $6, $7)", user.Username, user.Name, user.Surname, user.Email, user.Telephone, hashedPassword, false)
-	db.Close()
-	return err
+	res, err := users.InsertOne(ctx, bson.D{
+		{Key: "username", Value: user.Username},
+		{Key: "password", Value: user.Password},
+		{Key: "email", Value: user.Email},
+		{Key: "telephone", Value: user.Telephone},
+		{Key: "name", Value: user.Name},
+		{Key: "surname", Value: user.Surname},
+		{Key: "isValidated", Value: false},
+		{Key: "password", Value: hashedPassword},
+	})
+
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	return res.InsertedID, nil
+}
+
+func Drop() {
+	db, ctx := MongoDbConnect()
+
+	users := db.Collection("users")
+	users.Drop(ctx)
 }
 
 //Check if users credentials are already present in a database
 func IsUniqueUser(user model.User) (bool, error) {
-	db, err := DbConnect()
+	db, ctx := MongoDbConnect()
 
-	if err != nil {
-		db.Close()
+	users := db.Collection("users")
+	var useR model.User
+	err := users.FindOne(ctx, bson.D{{Key: "username", Value: user.Username}}).Decode(&useR)
 
-		return false, err
+	if err != mongo.ErrNoDocuments {
+		fmt.Println("here", user.Username)
+		return false, errors.New("user exists")
 	}
 
-	err = db.QueryRow(`SELECT username FROM users WHERE username =$1`, user.Username).Scan(&user.Username)
+	err = users.FindOne(ctx, bson.D{{Key: "email", Value: user.Email}}).Decode(&useR)
 
-	if err != sql.ErrNoRows {
-		db.Close()
-		return false, errors.New("username is not unique")
+	if err != mongo.ErrNoDocuments {
+		return false, errors.New("user exists")
 	}
 
-	err = db.QueryRow(`SELECT email FROM users WHERE email =$1`, user.Email).Scan(&user.Email)
+	err = users.FindOne(ctx, bson.D{{Key: "telephone", Value: user.Telephone}}).Decode(&useR)
 
-	if err != sql.ErrNoRows {
-		db.Close()
-		return false, errors.New("email is not unique")
-
+	if err != mongo.ErrNoDocuments {
+		return false, errors.New("user exists")
 	}
 
-	err = db.QueryRow(`SELECT telephone FROM users WHERE telephone =$1`, user.Telephone).Scan(&user.Telephone)
-
-	if err != sql.ErrNoRows {
-		db.Close()
-		return false, errors.New("telephone is not unique")
-	}
-	db.Close()
 	return true, nil
 }
 
 //as its name suggests
 func GetUserByUsername(username string) *model.User {
-	db, err := DbConnect()
+	db, ctx := MongoDbConnect()
 
-	if err != nil {
-		db.Close()
-		fmt.Println(err)
-		return nil
-	}
-
-	row := db.QueryRow(`SELECT userid, username, email, name, surname, telephone, isValidated FROM users WHERE username=$1`, username)
+	users := db.Collection("users")
 	var user model.User
-	err = row.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.Surname, &user.Telephone, &user.IsValidated)
+	err := users.FindOne(ctx, bson.D{{Key: "username", Value: username}}).Decode(&user)
+
 	if err != nil {
-		fmt.Println("Error while getting scanning the user: ", err)
-		db.Close()
-		return nil
+		fmt.Println("Couldn't get user: ", err)
 	}
-	db.Close()
+
 	return &user
 }
 
 //as its name suggests
-func GetUserById(id int) *model.User {
-	db, err := DbConnect()
+func GetUserById(id interface{}) *model.User {
+	db, ctx := MongoDbConnect()
+	users := db.Collection("users")
 
-	if err != nil {
-		db.Close()
-		fmt.Println(err)
-		return nil
-	}
-
-	row := db.QueryRow(`SELECT userid, username, email, name, surname, telephone, isValidated FROM users WHERE userid=$1`, id)
 	var user model.User
-	err = row.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.Surname, &user.Telephone, &user.IsValidated)
-	if err != nil {
-		fmt.Println("Error while getting scanning the user: ", err)
-		db.Close()
-		return nil
-	}
-	db.Close()
+	users.FindOne(ctx, bson.D{{Key: "_id", Value: id}}).Decode(&user)
+
 	return &user
+}
+
+func randomUser() *model.User {
+	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	var seededRand *rand.Rand = rand.New(
+		rand.NewSource(time.Now().UnixNano()))
+
+	b := make([]byte, 5)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+
+	RandomUsername := string(b) + "Test"
+	randomEmail := string(b) + "Email"
+	randomTel := string(b) + "Tel"
+	testUser := &model.User{Username: RandomUsername, Email: randomEmail, Telephone: randomTel, Password: "TestPassword", Name: "TestName", Surname: "TestSurname"}
+
+	return testUser
 }
 
 //updates user
 func UpdateUser(user model.User) error {
-	db, err := DbConnect()
+	db, ctx := MongoDbConnect()
 
-	if err != nil {
-		return err
+	users := db.Collection("users")
+
+	update := bson.D{
+		{"$set", bson.D{
+			{Key: "username", Value: user.Username},
+			{Key: "password", Value: user.Password},
+			{Key: "email", Value: user.Email},
+			{Key: "telephone", Value: user.Telephone},
+			{Key: "name", Value: user.Name},
+			{Key: "surname", Value: user.Surname},
+			{Key: "isValidated", Value: false},
+		}},
 	}
 
-	hashedPassword, err := EncryptPassword([]byte(user.Password))
+	_, err := users.UpdateOne(ctx, bson.D{{Key: "_id", Value: user.ID}}, update)
 
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec("update users set username=$1, name=$2, surname=$3, email=$4, telephone=$5, password=$6, isValidated=$7 where userid=$8", user.Username, user.Name, user.Surname, user.Email, user.Telephone, hashedPassword, user.IsValidated, user.ID)
-
-	db.Close()
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	return nil
+	return err
 }
 
 //Checks if credentials of the user are valid
-func IsValidCredentials(user model.User) (bool, error) {
-	db, err := DbConnect()
-	if err != nil {
-		db.Close()
-		return false, err
+func IsValidCredentials(user model.User) bool {
+	db, ctx := MongoDbConnect()
+
+	users := db.Collection("users")
+
+	var dbUser model.User
+
+	users.FindOne(ctx, bson.D{{Key: "username", Value: user.Username}}).Decode(&dbUser)
+
+	if dbUser.Username != "" {
+		val, _ := IsValidPassword(user.Password, dbUser.Password)
+		if val {
+			return true
+		}
+
 	}
 
-	pass := ""
+	users.FindOne(ctx, bson.D{{Key: "email", Value: user.Email}}).Decode(&dbUser)
 
-	err = db.QueryRow(`SELECT password FROM users WHERE username = $1`, user.Username).Scan(&pass)
-
-	if err != nil && err != sql.ErrNoRows {
-		fmt.Println("CHECKING VALID USERNAME ERROR: ", err)
-		return false, err
+	if dbUser.Email != "" {
+		val, _ := IsValidPassword(user.Password, dbUser.Password)
+		if val {
+			return true
+		}
 	}
 
-	valid, err := IsValidPassword(user.Password, pass)
+	users.FindOne(ctx, bson.D{{Key: "telephone", Value: user.Telephone}}).Decode(&dbUser)
 
-	if valid {
-		db.Close()
-		return true, nil
+	if dbUser.Telephone != "" {
+		val, _ := IsValidPassword(user.Password, dbUser.Password)
+		if val {
+			return true
+		}
 	}
 
-	err = db.QueryRow(`SELECT password FROM users WHERE email = $1`, user.Email).Scan(&pass)
-
-	if err != nil && err != sql.ErrNoRows {
-		fmt.Println("CHECKING VALID EMAIL ERROR: ", err)
-		return false, err
-	}
-
-	valid, err = IsValidPassword(user.Password, pass)
-
-	if valid {
-		db.Close()
-		return true, nil
-	}
-
-	err = db.QueryRow(`SELECT password FROM users WHERE telephone = $1`, user.Telephone).Scan(&pass)
-
-	if err != nil && err != sql.ErrNoRows {
-		fmt.Println("CHECKING VALID TEL ERROR: ", err)
-		return false, err
-	}
-
-	valid, err = IsValidPassword(user.Password, pass)
-
-	if valid {
-		db.Close()
-		return true, nil
-	}
-
-	db.Close()
-	return false, nil
-
+	return false
 }
 
 func DeleteUserByUsername(username string) bool {
-	db, err := DbConnect()
+	db, ctx := MongoDbConnect()
 
+	users := db.Collection("users")
+
+	_, err := users.DeleteOne(ctx, bson.D{{Key: "username", Value: username}})
 	if err != nil {
-		fmt.Println("Deleting user: ", err)
-		db.Close()
-		return false
-	}
-
-	_, err = db.Exec(`DELETE FROM users WHERE username=$1`, username)
-
-	if err != nil {
-		db.Close()
-		fmt.Println("DELETING ERROR: ", err)
+		fmt.Println(err)
 		return false
 	}
 
@@ -211,20 +201,23 @@ func DeleteUserByUsername(username string) bool {
 }
 
 //used to validate users email, tel etc
-func ValidateUser(id int) error {
-	db, err := DbConnect()
+func ValidateUser(username string) error {
+	db, ctx := MongoDbConnect()
+
+	user := db.Collection("users")
+
+	update := bson.D{
+		{"$set", bson.D{{"isValidated", true}}},
+	}
+
+	result, err := user.UpdateOne(ctx, bson.D{{Key: "username", Value: username}}, update)
 
 	if err != nil {
-		fmt.Println("VALIDATING USER ERROR: ", err)
+		fmt.Println("here: ", err)
 		return err
 	}
 
-	_, err = db.Exec("update users set isValidated=$1", true)
-
-	if err != nil {
-		fmt.Println("VALIDATING USER ERROR: ", err)
-		return err
-	}
+	fmt.Println("Update Result ", result)
 
 	return nil
 }

@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"math/rand"
 	model "shanyraq/models"
 	"testing"
@@ -9,17 +8,14 @@ import (
 )
 
 func TestDbConnection(t *testing.T) {
-	_, err := DbConnect()
+	_, _ = MongoDbConnect()
 
-	if err != nil {
-		t.Errorf("Failed connecting to db: %s", err)
-	}
 }
 
 func TestSaveUser(t *testing.T) {
 	testUser := &model.User{Username: "TestUsername", Email: "TestEmail", Name: "TestName", Surname: "TestSurname", Telephone: "87776665544", Password: "TestPassword"}
 
-	err := SaveUser(*testUser)
+	_, err := SaveUser(*testUser)
 
 	if err != nil {
 		if err.Error() != "username is not unique" && err.Error() != "email is not unique" && err.Error() != "telephone is not unique" {
@@ -36,14 +32,14 @@ func TestSaveUser(t *testing.T) {
 
 func TestIsUniqueUser(t *testing.T) {
 
-	testUser := randomUser()
+	testUser := RandomUser()
 	is_unique, err := IsUniqueUser(*testUser)
 
 	if !is_unique {
 		t.Errorf("user should be unique: %s", err)
 	}
 
-	err = SaveUser(*testUser)
+	_, err = SaveUser(*testUser)
 
 	if err != nil {
 		t.Errorf("Failed creating user: %s", err)
@@ -64,8 +60,8 @@ func TestIsUniqueUser(t *testing.T) {
 
 func TestGetUser(t *testing.T) {
 
-	testUser := randomUser()
-	err := SaveUser(*testUser)
+	testUser := RandomUser()
+	_, err := SaveUser(*testUser)
 
 	if err != nil {
 		if err.Error() != "username is not unique" && err.Error() != "email is not unique" && err.Error() != "telephone is not unique" {
@@ -82,7 +78,7 @@ func TestGetUser(t *testing.T) {
 	anotherUser := GetUserById(retrievedUser.ID)
 
 	if anotherUser.Username != testUser.Username {
-		t.Errorf("Smth wrong with GetUserById. Usernames should be same, testUsername is %s while retrieved on is %s", testUser.Username, retrievedUser.Username)
+		t.Errorf("Smth wrong with GetUserById. Usernames should be same, testUsername is %s while retrieved on is %s", testUser.Username, anotherUser.Username)
 	}
 
 	deleted := DeleteUserByUsername(testUser.Username)
@@ -94,9 +90,9 @@ func TestGetUser(t *testing.T) {
 }
 
 func TestUpdateUser(t *testing.T) {
-	testUser := randomUser()
+	testUser := RandomUser()
 
-	err := SaveUser(*testUser)
+	_, err := SaveUser(*testUser)
 
 	if err != nil {
 		if err.Error() != "username is not unique" && err.Error() != "email is not unique" && err.Error() != "telephone is not unique" {
@@ -127,9 +123,9 @@ func TestUpdateUser(t *testing.T) {
 }
 
 func TestIsValidCredentials(t *testing.T) {
-	testUser := randomUser()
+	testUser := RandomUser()
 
-	err := SaveUser(*testUser)
+	_, err := SaveUser(*testUser)
 
 	if err != nil {
 		if err.Error() != "username is not unique" && err.Error() != "email is not unique" && err.Error() != "telephone is not unique" {
@@ -137,16 +133,15 @@ func TestIsValidCredentials(t *testing.T) {
 		}
 	}
 
-	is_valid, err := IsValidCredentials(*testUser)
+	is_valid := IsValidCredentials(*testUser)
 
 	if !is_valid {
-		fmt.Println("IS valid credentials testing error: ", err)
 		t.Errorf("Credentials should be valid!")
 	}
 
 	testUser.Password = "some bullshit"
 
-	is_valid, err = IsValidCredentials(*testUser)
+	is_valid = IsValidCredentials(*testUser)
 
 	if is_valid {
 		t.Errorf("Credentials shouldn't be valid!")
@@ -160,23 +155,22 @@ func TestIsValidCredentials(t *testing.T) {
 }
 
 func TestValidateUser(t *testing.T) {
-	testUser := randomUser()
+	testUser := RandomUser()
 
-	err := SaveUser(*testUser)
+	_, err := SaveUser(*testUser)
 	if err != nil {
 		if err.Error() != "username is not unique" && err.Error() != "email is not unique" && err.Error() != "telephone is not unique" {
 			t.Errorf("Failed creating user: %s", err)
 		}
 	}
 
-	err = ValidateUser(testUser.ID)
+	err = ValidateUser(testUser.Username)
 
 	if err != nil {
 		t.Errorf("VALIDATING USER FAIL: %s", err.Error())
 	}
 
 	dbUser := GetUserByUsername(testUser.Username)
-
 	if !dbUser.IsValidated {
 		t.Errorf("User should be validated! ")
 	}
@@ -188,7 +182,7 @@ func TestValidateUser(t *testing.T) {
 	}
 }
 
-func randomUser() *model.User {
+func RandomUser() *model.User {
 	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	var seededRand *rand.Rand = rand.New(
 		rand.NewSource(time.Now().UnixNano()))
@@ -198,10 +192,10 @@ func randomUser() *model.User {
 		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 
-	randomUsername := string(b) + "Test"
+	RandomUsername := string(b) + "Test"
 	randomEmail := string(b) + "Email"
 	randomTel := string(b) + "Tel"
-	testUser := &model.User{Username: randomUsername, Email: randomEmail, Telephone: randomTel, Password: "TestPassword", Name: "TestName", Surname: "TestSurname"}
+	testUser := &model.User{Username: RandomUsername, Email: randomEmail, Telephone: randomTel, Password: "TestPassword", Name: "TestName", Surname: "TestSurname"}
 
 	return testUser
 }

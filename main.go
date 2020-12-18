@@ -13,10 +13,7 @@ import (
 
 func main() {
 
-	_, err := db.DbConnect()
-	if err != nil {
-		panic(err)
-	}
+	_, _ = db.MongoDbConnect()
 
 	port := os.Getenv("PORT")
 
@@ -32,7 +29,7 @@ func main() {
 	handler := cors.Default().Handler(mux)
 
 	fmt.Println("Running on port: " + port)
-	err = http.ListenAndServe(":"+port, handler)
+	err := http.ListenAndServe(":"+port, handler)
 
 	if err != nil {
 		log.Fatal("Listen and serve err: ", err)
