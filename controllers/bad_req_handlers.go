@@ -40,3 +40,16 @@ func NotAuthorized(w http.ResponseWriter, r *http.Request) {
 	vals, _ := json.Marshal(err)
 	w.Write(vals)
 }
+
+func InternalServerError(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusInternalServerError)
+
+	err := struct {
+		Error string `json:"error"`
+	}{
+		"internal server",
+	}
+
+	vals, _ := json.Marshal(err)
+	w.Write(vals)
+}

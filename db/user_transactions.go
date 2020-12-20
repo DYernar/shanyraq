@@ -9,6 +9,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 //Save user to db
@@ -220,4 +221,49 @@ func ValidateUser(username string) error {
 	fmt.Println("Update Result ", result)
 
 	return nil
+}
+
+func InsertToken(user model.User, tokentring string) error {
+	db, ctx := MongoDbConnect()
+
+	tokens := db.Collection("tokens")
+
+	opts := options.Update().SetUpsert(true)
+	filter := bson.D{{"username", user.Username}}
+	update := bson.D{{"$set", bson.D{{"token", tokentring}}}}
+
+	result, err := tokens.UpdateOne(ctx, filter, update, opts)
+
+	fmt.Println(result)
+	return err
+}
+
+func DeleteToken(username string, tokenString string) {
+	db, ctx := MongoDbConnect()
+	tokens := db.Collection("tokens")
+	_, err := tokens.DeleteOne(ctx, bson.D{{Key: "username", Value: username}})
+
+	if err != nil {
+		fmt.Println("DELETING TOKEN :", err)
+	}
+
+}
+
+func GetToken(username string) string {
+	db, ctx := MongoDbConnect()
+
+	tokens := db.Collection("tokens")
+	user := struct {
+		Username string
+		Token    string
+	}{"", ""}
+	filter := bson.D{{Key: "username", Value: username}}
+	err := tokens.FindOne(ctx, filter).Decode(&user)
+
+	if err != nil {
+		return ""
+	}
+
+	return user.Token
+
 }

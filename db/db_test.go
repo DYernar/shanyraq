@@ -182,6 +182,17 @@ func TestValidateUser(t *testing.T) {
 	}
 }
 
+func TestInsertToken(t *testing.T) {
+	user := RandomUser()
+	token := "TestToken"
+
+	err := InsertToken(*user, token)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+}
+
 func RandomUser() *model.User {
 	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	var seededRand *rand.Rand = rand.New(

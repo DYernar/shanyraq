@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const mongoURI = "mongodb://localhost:27017/mydb?compressors=disabled&gssapiServiceName=mongodb"
+const mongoURI = "mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=mongodb"
 
 func MongoDbConnect() (*mongo.Database, context.Context) {
 	clientConfs := options.Client().ApplyURI(mongoURI)
@@ -21,5 +21,4 @@ func MongoDbConnect() (*mongo.Database, context.Context) {
 
 	ctx := context.TODO()
 	return client.Database("mydb"), ctx
-
 }
